@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cra-scope"
-version = "0.1.1"
+version = "0.1.2"
 description = "Open-source CLI for preparing EU Cyber Resilience Act (Regulation 2024/2847) Article 14 notifications for the ENISA Single Reporting Platform (SRP)."
 readme = "README.md"
 requires-python = ">=3.10"
