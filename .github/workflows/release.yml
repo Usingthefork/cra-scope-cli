@@ -1,0 +1,81 @@
+name: Release to PyPI
+
+# Publishes to PyPI when a tag like v1.2.3 is pushed.
+# Uses PyPI Trusted Publishing (OIDC) — no long-lived API token required.
+#
+# One-time setup on PyPI:
+#   1. Go to https://pypi.org/manage/account/publishing/
+#   2. Add a pending trusted publisher with:
+#        PyPI Project Name:    cra-scope
+#        Owner:                Usingthefork
+#        Repository name:      cra-scope-cli
+#        Workflow filename:    release.yml
+#        Environment name:     pypi
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Verify tag matches pyproject version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PYPROJECT_VERSION=$(python -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+          echo "Tag version:        $TAG"
+          echo "pyproject version:  $PYPROJECT_VERSION"
+          if [ "$TAG" != "$PYPROJECT_VERSION" ]; then
+            echo "::error::Tag $TAG does not match pyproject.toml version $PYPROJECT_VERSION"
+            exit 1
+          fi
+
+      - name: Build sdist + wheel
+        run: python -m build
+
+      - name: Verify distributions
+        run: python -m twine check dist/*
+
+      - name: Upload dist artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI (OIDC)
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/cra-scope/
+    permissions:
+      id-token: write   # required for trusted publishing
+    steps:
+      - name: Download dist artefacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Usingthefork/cra-scope-cli/security/policy
+    about: Please report security issues privately via SECURITY.md, not as a public issue.
+  - name: Managed SaaS questions
+    url: https://crascope.com
+    about: For multi-product clocks, dashboards, alerting and audit archive, see CRA Scope SaaS.

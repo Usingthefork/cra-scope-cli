@@ -1,0 +1,39 @@
+name: Regulatory update
+description: ENISA, EC or CRA-text change that affects this tool
+labels: ["regulatory", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when ENISA, the European Commission, or another
+        official body publishes guidance, a schema, an FAQ update, or an
+        implementing act that changes what this tool must produce.
+  - type: input
+    id: source
+    attributes:
+      label: Source URL
+      description: Link to the official publication.
+      placeholder: "https://digital-strategy.ec.europa.eu/..."
+    validations:
+      required: true
+  - type: input
+    id: published-date
+    attributes:
+      label: Publication date
+      placeholder: "2026-09-11"
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: What changed?
+      description: Summarise the regulatory change in plain English.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact on cra-scope
+      description: Which payload builders, schemas, or CSIRT entries are affected?
+    validations:
+      required: true
