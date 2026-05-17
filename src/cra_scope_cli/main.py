@@ -24,7 +24,7 @@ from cra_scope_core import (
 from cra_scope_core.csirt import EU_CSIRT_MAP, is_eu_member_state
 from cra_scope_core.kev import lookup_cve
 
-SAAS_URL = "https://crascope.eu"
+SAAS_URL = "https://crascope.com"
 
 
 def _emit_json(payload: dict[str, Any], output: Optional[str]) -> None:

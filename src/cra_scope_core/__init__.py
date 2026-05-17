@@ -23,7 +23,7 @@ Public API:
 
 For the managed multi-tenant workflow platform (compliance clocks,
 case management, dashboards, alerting, audit archive), see CRA Scope SaaS:
-https://crascope.eu
+https://crascope.com
 """
 
 from cra_scope_core.csirt import EU_CSIRT_MAP, resolve_csirt

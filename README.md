@@ -11,14 +11,14 @@ Article 14 (and the comparable structure of Article 15), validates them
 against a stable JSON schema, resolves the designated CSIRT for each EU
 Member State, and checks CVEs against the public CISA KEV catalogue.
 
-It is the **open-source core** of the [CRA Scope](https://crascope.eu)
+It is the **open-source core** of the [CRA Scope](https://crascope.com)
 ecosystem. Use it to prepare payloads in CI, in scripts, or at the
 keyboard — then submit them through the ENISA SRP portal under your
 manufacturer's EU Login account, as required by EC FAQ §4.6.1.
 
 For a fully managed workflow — compliance clocks, multi-product case
 management, evidence archival, board dashboards, CSIRT/SIEM/ITSM
-integrations, alerting, and audit trail — see [CRA Scope SaaS](https://crascope.eu).
+integrations, alerting, and audit trail — see [CRA Scope SaaS](https://crascope.com).
 
 ---
 
@@ -125,7 +125,7 @@ print(resolve_csirt("DE"))
 - It does **not** run a compliance clock, track multiple products, store
   evidence, page on-call engineers, push to your SIEM/ITSM, or produce a
   signed audit archive. Those are workflow concerns better handled by a
-  managed platform — see [CRA Scope SaaS](https://crascope.eu).
+  managed platform — see [CRA Scope SaaS](https://crascope.com).
 - It is **not** legal advice. CRA Article 14 obligations apply from 11
   September 2026; you remain responsible for your own compliance.
 

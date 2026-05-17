@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cra-scope"
-version = "0.1.0"
+version = "0.1.1"
 description = "Open-source CLI for preparing EU Cyber Resilience Act (Regulation 2024/2847) Article 14 notifications for the ENISA Single Reporting Platform (SRP)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [
-    { name = "CRA Scope B.V.", email = "hello@crascope.eu" },
+    { name = "CRA Scope B.V.", email = "hello@crascope.com" },
 ]
 keywords = [
     "cra",
@@ -52,11 +52,11 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://crascope.eu"
+Homepage = "https://crascope.com"
 Documentation = "https://github.com/Usingthefork/cra-scope-cli#readme"
 Source = "https://github.com/Usingthefork/cra-scope-cli"
 Issues = "https://github.com/Usingthefork/cra-scope-cli/issues"
-"Managed SaaS" = "https://crascope.eu"
+"Managed SaaS" = "https://crascope.com"
 
 [project.scripts]
 cra-scope = "cra_scope_cli.main:cli"
