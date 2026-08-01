@@ -28,6 +28,7 @@ https://crascope.com
 
 from cra_scope_core.csirt import EU_CSIRT_MAP, resolve_csirt
 from cra_scope_core.srp import (
+    VALID_DISSEMINATION_DELAY_GROUNDS,
     ValidationError,
     build_early_warning,
     build_final_report,
@@ -40,6 +41,7 @@ from cra_scope_core.version import __version__
 __all__ = [
     "__version__",
     "EU_CSIRT_MAP",
+    "VALID_DISSEMINATION_DELAY_GROUNDS",
     "resolve_csirt",
     "ValidationError",
     "build_early_warning",

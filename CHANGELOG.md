@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] — 2026-08-01
+
+### Added
+
+- **EU representative (AR) support** — all four payload builders now accept
+  `eu_representative_name`, `eu_representative_country`, and
+  `eu_representative_contact`. When provided, `manufacturer.eu_representative`
+  is included in the payload and CSIRT routing uses the AR country.
+  Aligned with ENISA AR user-guidance published 31 Jul 2026.
+
+- **Art. 16(2) dissemination delay / PEC** — `build_vulnerability_notification`
+  and `build_incident_notification` now accept `dissemination_delay_requested`,
+  `dissemination_delay_grounds` (`art_16_2_a` / `art_16_2_b` / `art_16_2_c`),
+  and `dissemination_delay_justification`. When set, a `dissemination_delay`
+  block is added. The ENISA SRP portal shows such notifications as
+  "72h under PEC" (Particularly Exceptional Circumstances).
+
+- **ENISA SRP FAQ Q16 optional fields** — all builders now accept
+  `notification_level`, `title`, `euvd_id`, `sensitivity_of_information`,
+  `product_type`, and `annex_category`. Non-empty values are included in
+  the payload.
+
+- `VALID_DISSEMINATION_DELAY_GROUNDS` constant exported from `cra_scope_core`.
+
+### Changed
+
+- `schema_version` bumped `1.0.0` → `1.1.0`. New fields are all optional;
+  existing payloads remain valid.
+- `validate_notification` now checks `eu_representative.country` (must be an
+  EU Member State when present) and validates `dissemination_delay.grounds`
+  against `VALID_DISSEMINATION_DELAY_GROUNDS`.
+
 ## [0.1.3] — 2026-05-17
 
 ### Added

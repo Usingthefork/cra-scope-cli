@@ -9,12 +9,27 @@ Article 14 (and the comparable structure of Article 15):
   * 14 d  — final vulnerability report (Art. 14(2)(c))
   * 1 m   — final incident report      (Art. 14(4)(c))
 
-Output payloads follow a stable JSON schema (``schema_version = "1.0.0"``)
+Output payloads follow a stable JSON schema (``schema_version = "1.1.0"``)
 designed for the ENISA Single Reporting Platform (SRP).
+
+v1.1.0 additions (2026-08-01, aligned with ENISA AR guidance 31 Jul 2026):
+  * ``eu_representative`` block in the manufacturer section — required when a
+    non-EU manufacturer appoints an EU-based Assigned Representative (AR) to
+    operate the SRP portal on their behalf. When present the AR country is
+    used for CSIRT routing.
+  * ``dissemination_delay`` top-level block — supports Art. 16(2) Particularly
+    Exceptional Circumstances (PEC). When present on a 72h notification the
+    ENISA portal shows status "72h under PEC". Grounds: art_16_2_a/b/c per
+    Delegated Regulation (EU) 2026/881.
+  * ENISA SRP FAQ Q16 optional fields added to all builders:
+    ``notification_level``, ``title``, ``euvd_id``,
+    ``sensitivity_of_information``, ``product_type``, ``annex_category``.
 
 This module does NOT submit notifications. ENISA SRP authentication uses
 EU Login (CAS), a closed government identity scheme; Article 14 reporting
 is the manufacturer's non-delegable legal obligation (EC FAQ §4.6.1).
+Submission may be performed by the manufacturer's own SRP user or, where
+appointed, their AR user in the ENISA portal.
 Use this library to *prepare* payloads, then submit them via the SRP portal
 or your designated CSIRT's intake channel.
 """
@@ -26,8 +41,11 @@ from typing import Any, Optional
 
 from cra_scope_core.csirt import EU_CSIRT_MAP, resolve_csirt
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
 REGULATORY_BASIS = "Regulation (EU) 2024/2847"
+
+# Valid Art. 16(2) grounds for dissemination delay (Delegated Reg. (EU) 2026/881)
+VALID_DISSEMINATION_DELAY_GROUNDS = {"art_16_2_a", "art_16_2_b", "art_16_2_c"}
 
 _VALID_NOTIFICATION_TYPES = {
     "early_warning",
@@ -72,19 +90,58 @@ def build_early_warning(
     affected_member_states: Optional[list[str]] = None,
     article_basis: str = "art_14_mandatory",
     report_subject_type: str = "vulnerability",
+    # EU representative (AR) — required for non-EU manufacturers (v1.1.0)
+    eu_representative_name: str = "",
+    eu_representative_country: str = "",
+    eu_representative_contact: str = "",
+    # ENISA SRP FAQ Q16 optional fields (v1.1.0)
+    notification_level: str = "",
+    title: str = "",
+    euvd_id: str = "",
+    sensitivity_of_information: str = "",
+    product_type: str = "",
+    annex_category: str = "",
 ) -> dict[str, Any]:
     """Build an Early Warning notification (CRA Art. 14 stage (a)).
 
     Must be submitted within 24 hours of becoming aware of an actively
     exploited vulnerability (or a severe incident).
+
+    When a non-EU manufacturer has appointed an EU Assigned Representative (AR),
+    pass ``eu_representative_country`` — CSIRT routing will use that country
+    rather than the manufacturer's own country.
     """
-    csirt = resolve_csirt(manufacturer_country)
+    # AR routing: if an EU representative country is provided, route to that CSIRT
+    routing_country = eu_representative_country.upper() if eu_representative_country else manufacturer_country
+    csirt = resolve_csirt(routing_country)
     now = datetime.now(timezone.utc).isoformat()
 
     if article_basis == "art_14_mandatory":
         cra_article = "14(4)(a)" if report_subject_type == "severe_incident" else "14(2)(a)"
     else:
         cra_article = "15(1)"
+
+    manufacturer_block: dict[str, Any] = {
+        "name": manufacturer_name,
+        "main_establishment_country": manufacturer_country,
+        "contact_email": manufacturer_contact,
+    }
+    if eu_representative_name or eu_representative_country or eu_representative_contact:
+        manufacturer_block["eu_representative"] = {
+            "name": eu_representative_name,
+            "country": eu_representative_country,
+            "contact_email": eu_representative_contact,
+        }
+
+    product_block: dict[str, Any] = {
+        "name": product_name,
+        "version": product_version,
+        "category": product_category,
+    }
+    if product_type:
+        product_block["product_type"] = product_type
+    if annex_category:
+        product_block["annex_category"] = annex_category
 
     payload: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
@@ -95,19 +152,21 @@ def build_early_warning(
         "regulatory_basis": REGULATORY_BASIS,
         "submission_timestamp": now,
         "deadline_hours": 24,
-        "manufacturer": {
-            "name": manufacturer_name,
-            "main_establishment_country": manufacturer_country,
-            "contact_email": manufacturer_contact,
-        },
+        "manufacturer": manufacturer_block,
         "designated_csirt": csirt,
         "enisa_simultaneous": True,
-        "product": {
-            "name": product_name,
-            "version": product_version,
-            "category": product_category,
-        },
+        "product": product_block,
     }
+
+    # Q16 optional top-level fields
+    if notification_level:
+        payload["notification_level"] = notification_level
+    if title:
+        payload["title"] = title
+    if euvd_id:
+        payload["euvd_id"] = euvd_id
+    if sensitivity_of_information:
+        payload["sensitivity_of_information"] = sensitivity_of_information
 
     subject_block = {
         "id": vulnerability_id,
@@ -146,14 +205,58 @@ def build_incident_notification(
     cross_border_impact: Optional[bool] = None,
     affected_member_states: Optional[list[str]] = None,
     article_basis: str = "art_14_mandatory",
+    # EU representative (AR) — required for non-EU manufacturers (v1.1.0)
+    eu_representative_name: str = "",
+    eu_representative_country: str = "",
+    eu_representative_contact: str = "",
+    # Art. 16(2) dissemination delay / PEC (v1.1.0)
+    dissemination_delay_requested: bool = False,
+    dissemination_delay_grounds: Optional[list[str]] = None,
+    dissemination_delay_justification: str = "",
+    # ENISA SRP FAQ Q16 optional fields (v1.1.0)
+    notification_level: str = "",
+    title: str = "",
+    euvd_id: str = "",
+    sensitivity_of_information: str = "",
+    product_type: str = "",
+    annex_category: str = "",
 ) -> dict[str, Any]:
-    """Build a severe-incident notification (CRA Art. 14(4)(b))."""
-    csirt = resolve_csirt(manufacturer_country)
+    """Build a severe-incident notification (CRA Art. 14(4)(b)).
+
+    Pass ``dissemination_delay_requested=True`` and one or more
+    ``dissemination_delay_grounds`` to invoke Art. 16(2) PEC — the ENISA
+    portal will show this notification as "72h under PEC".
+    """
+    routing_country = eu_representative_country.upper() if eu_representative_country else manufacturer_country
+    csirt = resolve_csirt(routing_country)
     now = datetime.now(timezone.utc).isoformat()
 
     cra_article = "14(4)(b)" if article_basis == "art_14_mandatory" else "15(1)"
 
-    return {
+    manufacturer_block: dict[str, Any] = {
+        "name": manufacturer_name,
+        "main_establishment_country": manufacturer_country,
+        "contact_email": manufacturer_contact,
+    }
+    if eu_representative_name or eu_representative_country or eu_representative_contact:
+        manufacturer_block["eu_representative"] = {
+            "name": eu_representative_name,
+            "country": eu_representative_country,
+            "contact_email": eu_representative_contact,
+        }
+
+    product_block: dict[str, Any] = {
+        "name": product_name,
+        "version": product_version,
+        "category": product_category,
+        "estimated_affected_users": estimated_affected_users,
+    }
+    if product_type:
+        product_block["product_type"] = product_type
+    if annex_category:
+        product_block["annex_category"] = annex_category
+
+    payload: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "notification_type": "incident_notification",
         "cra_article": cra_article,
@@ -163,19 +266,10 @@ def build_incident_notification(
         "submission_timestamp": now,
         "deadline_hours": 72,
         "early_warning_reference": early_warning_reference,
-        "manufacturer": {
-            "name": manufacturer_name,
-            "main_establishment_country": manufacturer_country,
-            "contact_email": manufacturer_contact,
-        },
+        "manufacturer": manufacturer_block,
         "designated_csirt": csirt,
         "enisa_simultaneous": True,
-        "product": {
-            "name": product_name,
-            "version": product_version,
-            "category": product_category,
-            "estimated_affected_users": estimated_affected_users,
-        },
+        "product": product_block,
         "incident": {
             "id": incident_id,
             "severe_incident": True,
@@ -192,6 +286,24 @@ def build_incident_notification(
             "user_guidance": user_guidance,
         },
     }
+
+    if dissemination_delay_requested or dissemination_delay_grounds:
+        payload["dissemination_delay"] = {
+            "requested": dissemination_delay_requested,
+            "grounds": dissemination_delay_grounds or [],
+            "justification": dissemination_delay_justification,
+        }
+
+    if notification_level:
+        payload["notification_level"] = notification_level
+    if title:
+        payload["title"] = title
+    if euvd_id:
+        payload["euvd_id"] = euvd_id
+    if sensitivity_of_information:
+        payload["sensitivity_of_information"] = sensitivity_of_information
+
+    return payload
 
 
 def build_vulnerability_notification(
@@ -220,13 +332,58 @@ def build_vulnerability_notification(
     cross_border_impact: Optional[bool] = None,
     affected_member_states: Optional[list[str]] = None,
     article_basis: str = "art_14_mandatory",
+    # EU representative (AR) — required for non-EU manufacturers (v1.1.0)
+    eu_representative_name: str = "",
+    eu_representative_country: str = "",
+    eu_representative_contact: str = "",
+    # Art. 16(2) dissemination delay / PEC (v1.1.0)
+    dissemination_delay_requested: bool = False,
+    dissemination_delay_grounds: Optional[list[str]] = None,
+    dissemination_delay_justification: str = "",
+    # ENISA SRP FAQ Q16 optional fields (v1.1.0)
+    notification_level: str = "",
+    title: str = "",
+    euvd_id: str = "",
+    sensitivity_of_information: str = "",
+    product_type: str = "",
+    annex_category: str = "",
 ) -> dict[str, Any]:
-    """Build a Vulnerability Notification (CRA Art. 14(2)(b))."""
-    csirt = resolve_csirt(manufacturer_country)
+    """Build a Vulnerability Notification (CRA Art. 14(2)(b)).
+
+    Pass ``dissemination_delay_requested=True`` and one or more
+    ``dissemination_delay_grounds`` to invoke Art. 16(2) PEC — the ENISA
+    portal will show this notification as "72h under PEC".
+    """
+    routing_country = eu_representative_country.upper() if eu_representative_country else manufacturer_country
+    csirt = resolve_csirt(routing_country)
     now = datetime.now(timezone.utc).isoformat()
     cra_article = "14(2)(b)" if article_basis == "art_14_mandatory" else "15(1)"
 
-    return {
+    manufacturer_block: dict[str, Any] = {
+        "name": manufacturer_name,
+        "main_establishment_country": manufacturer_country,
+        "contact_email": manufacturer_contact,
+    }
+    if eu_representative_name or eu_representative_country or eu_representative_contact:
+        manufacturer_block["eu_representative"] = {
+            "name": eu_representative_name,
+            "country": eu_representative_country,
+            "contact_email": eu_representative_contact,
+        }
+
+    product_block: dict[str, Any] = {
+        "name": product_name,
+        "version": product_version,
+        "category": product_category,
+        "affected_versions": affected_product_versions or [],
+        "estimated_affected_users": estimated_affected_users,
+    }
+    if product_type:
+        product_block["product_type"] = product_type
+    if annex_category:
+        product_block["annex_category"] = annex_category
+
+    payload: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "notification_type": "vulnerability_notification",
         "cra_article": cra_article,
@@ -235,20 +392,10 @@ def build_vulnerability_notification(
         "submission_timestamp": now,
         "deadline_hours": 72,
         "early_warning_reference": early_warning_reference,
-        "manufacturer": {
-            "name": manufacturer_name,
-            "main_establishment_country": manufacturer_country,
-            "contact_email": manufacturer_contact,
-        },
+        "manufacturer": manufacturer_block,
         "designated_csirt": csirt,
         "enisa_simultaneous": True,
-        "product": {
-            "name": product_name,
-            "version": product_version,
-            "category": product_category,
-            "affected_versions": affected_product_versions or [],
-            "estimated_affected_users": estimated_affected_users,
-        },
+        "product": product_block,
         "vulnerability": {
             "id": vulnerability_id,
             "actively_exploited": True,
@@ -269,6 +416,24 @@ def build_vulnerability_notification(
             "user_guidance": user_guidance,
         },
     }
+
+    if dissemination_delay_requested or dissemination_delay_grounds:
+        payload["dissemination_delay"] = {
+            "requested": dissemination_delay_requested,
+            "grounds": dissemination_delay_grounds or [],
+            "justification": dissemination_delay_justification,
+        }
+
+    if notification_level:
+        payload["notification_level"] = notification_level
+    if title:
+        payload["title"] = title
+    if euvd_id:
+        payload["euvd_id"] = euvd_id
+    if sensitivity_of_information:
+        payload["sensitivity_of_information"] = sensitivity_of_information
+
+    return payload
 
 
 def build_final_report(
@@ -305,19 +470,55 @@ def build_final_report(
     article_basis: str = "art_14_mandatory",
     deadline_days: int = 14,
     report_subject_type: str = "vulnerability",
+    # EU representative (AR) — required for non-EU manufacturers (v1.1.0)
+    eu_representative_name: str = "",
+    eu_representative_country: str = "",
+    eu_representative_contact: str = "",
+    # ENISA SRP FAQ Q16 optional fields (v1.1.0)
+    notification_level: str = "",
+    title: str = "",
+    euvd_id: str = "",
+    sensitivity_of_information: str = "",
+    product_type: str = "",
+    annex_category: str = "",
 ) -> dict[str, Any]:
     """Build a Final Report (CRA Art. 14(2)(c) / 14(4)(c)).
 
     Vulnerability final report: 14 days after a corrective measure is available.
     Severe-incident final report: 1 month after the incident notification.
     """
-    csirt = resolve_csirt(manufacturer_country)
+    routing_country = eu_representative_country.upper() if eu_representative_country else manufacturer_country
+    csirt = resolve_csirt(routing_country)
     now = datetime.now(timezone.utc).isoformat()
 
     if article_basis == "art_14_mandatory":
         cra_article = "14(4)(c)" if report_subject_type == "severe_incident" else "14(2)(c)"
     else:
         cra_article = "15(1)"
+
+    manufacturer_block: dict[str, Any] = {
+        "name": manufacturer_name,
+        "main_establishment_country": manufacturer_country,
+        "contact_email": manufacturer_contact,
+    }
+    if eu_representative_name or eu_representative_country or eu_representative_contact:
+        manufacturer_block["eu_representative"] = {
+            "name": eu_representative_name,
+            "country": eu_representative_country,
+            "contact_email": eu_representative_contact,
+        }
+
+    product_block: dict[str, Any] = {
+        "name": product_name,
+        "version": product_version,
+        "category": product_category,
+        "affected_versions": affected_product_versions or [],
+        "estimated_affected_users": estimated_affected_users,
+    }
+    if product_type:
+        product_block["product_type"] = product_type
+    if annex_category:
+        product_block["annex_category"] = annex_category
 
     payload: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
@@ -330,20 +531,10 @@ def build_final_report(
         "deadline_days": deadline_days,
         "early_warning_reference": early_warning_reference,
         "notification_reference": notification_reference,
-        "manufacturer": {
-            "name": manufacturer_name,
-            "main_establishment_country": manufacturer_country,
-            "contact_email": manufacturer_contact,
-        },
+        "manufacturer": manufacturer_block,
         "designated_csirt": csirt,
         "enisa_simultaneous": True,
-        "product": {
-            "name": product_name,
-            "version": product_version,
-            "category": product_category,
-            "affected_versions": affected_product_versions or [],
-            "estimated_affected_users": estimated_affected_users,
-        },
+        "product": product_block,
         "corrective_measures": {
             "applied": corrective_measures_applied or [],
             "ongoing": corrective_measures_ongoing or [],
@@ -354,6 +545,15 @@ def build_final_report(
         "incident_timeline": timeline or [],
         "lessons_learned": lessons_learned,
     }
+
+    if notification_level:
+        payload["notification_level"] = notification_level
+    if title:
+        payload["title"] = title
+    if euvd_id:
+        payload["euvd_id"] = euvd_id
+    if sensitivity_of_information:
+        payload["sensitivity_of_information"] = sensitivity_of_information
 
     if report_subject_type == "severe_incident":
         payload["incident"] = {
@@ -425,6 +625,35 @@ def validate_notification(payload: dict) -> list[str]:
             f"Country {country!r} is not a recognized EU Member State. "
             "Manufacturer must have main establishment in an EU Member State."
         )
+
+    # Validate eu_representative block if present
+    eu_rep = mfr.get("eu_representative")
+    if eu_rep is not None:
+        if not isinstance(eu_rep, dict):
+            errors.append("manufacturer.eu_representative must be an object")
+        else:
+            rep_country = eu_rep.get("country", "")
+            if rep_country and rep_country.upper() not in EU_CSIRT_MAP:
+                errors.append(
+                    f"manufacturer.eu_representative.country {rep_country!r} is not "
+                    "a recognized EU Member State."
+                )
+
+    # Validate dissemination_delay block if present (Art. 16(2) / PEC)
+    delay = payload.get("dissemination_delay")
+    if delay is not None:
+        if not isinstance(delay, dict):
+            errors.append("dissemination_delay must be an object")
+        else:
+            bad_grounds = [
+                g for g in (delay.get("grounds") or [])
+                if g not in VALID_DISSEMINATION_DELAY_GROUNDS
+            ]
+            if bad_grounds:
+                errors.append(
+                    f"Invalid dissemination_delay.grounds: {bad_grounds}. "
+                    f"Must be subset of {sorted(VALID_DISSEMINATION_DELAY_GROUNDS)}."
+                )
 
     product = payload.get("product", {}) or {}
     for field in ("name", "version"):
